@@ -5,6 +5,7 @@ import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -68,13 +69,19 @@ public class RBACRuleEngine {
 		// evaluate a decision
 		DmnDecisionTableResult result = dmnEngine.evaluateDecisionTable(decision, data);
 
-		String str = result.getSingleResult().getSingleEntry();
-		System.out.println(str);
-		List<String> myList = new ArrayList<String>(Arrays.asList(str.split(",")));
+		List<String> myList = null;
+
+		if (result != null && result.getSingleResult() != null) {
+			String str = result.getSingleResult().getSingleEntry();
+			System.out.println(str);
+			myList = new ArrayList<String>(Arrays.asList(str.split(",")));
+
+		}
 		RPResponse response = new RPResponse();
 		response.setRole(request.getRole());
 		response.setPermission(myList);
 		return response;
+
 	}
 
 	@RequestMapping("/addrule")
@@ -82,6 +89,7 @@ public class RBACRuleEngine {
 
 		String currentDMN = "RBAC_RULES.dmn";
 		String outputDMN = "OUT_RBAC_RULES.dmn";
+		StringBuffer sb = new StringBuffer();
 
 		if (request != null) {
 			System.out.println(request.toString());
@@ -95,51 +103,43 @@ public class RBACRuleEngine {
 
 				for (RolePermission rolePer : request.getRules()) {
 
+					sb.append("-"+rolePer.getRole());
 					String output = String.join(",", rolePer.getPermission());
 
 					Rule newRuleToAdd = createRuleNew(dmnModelInstance, 1, "\"" + rolePer.getRole() + "\"",
 							"\"" + output + "\"");
 					decisionTable.getRules().add(newRuleToAdd);
 				} // for
-				File dmnFile = new File("src/main/resources/"+outputDMN);
+				File dmnFile = new File("src/main/resources/" + currentDMN);
 				Dmn.writeModelToFile(dmnFile, dmnModelInstance);
 
 				System.out.println("generate dmn file: " + dmnFile.getAbsolutePath());
+
+				ProcessEngine processEngine = ProcessEngineConfiguration
+						.createStandaloneInMemProcessEngineConfiguration().buildProcessEngine();
+
+				System.out.println(processEngine.VERSION);
+				try {
+//					      processEngine.getRepositoryService()
+//					        .createDeployment()
+//					        .name("new dmn deployment")
+//					        //.addClasspathResource("OUT_RBAC_RULES.dmn")
+//					        .addInputStream(outputDMN, ClassLoader.getSystemResourceAsStream(outputDMN))
+//					        .deploy();
+
+					// when instance is deployed via addString method
+					org.camunda.bpm.engine.repository.Deployment deployment = processEngine.getRepositoryService()
+							.createDeployment()
+							.addString("src/main/resources/" + currentDMN, Dmn.convertToString(dmnModelInstance))
+							.name("Deployment" + sb.toString())
+							.deploy();
+
+					System.out.println("Deployment ID : " + deployment.getId());
+				} finally {
+					// processEngine.close();
+				}
 			}
 		}
-
-//		
-//		 ProcessEngine processEngine = ProcessEngineConfiguration.createStandaloneInMemProcessEngineConfiguration()
-//			      .buildProcessEngine();
-//
-//			    try {
-//			      processEngine.getRepositoryService()
-//			        .createDeployment()
-//			        .name("new dmn deployment")
-//			        //.addClasspathResource("OUT_RBAC_RULES.dmn")
-//			        .addInputStream(outputDMN, ClassLoader.getSystemResourceAsStream(outputDMN))
-//			        .deploy();
-//			    }
-//			    finally {
-//			      processEngine.close();
-//			    }
-			    
-		// **********************
-
-//	    DmnModelInstance dmnModelInstance = Dmn.readModelFromStream(inputStream);
-//	    DecisionTable decisionTable = dmnModelInstance.getModelElementById("tblRBACRules");
-//	    decisionTable.getRules().add(newRules);
-
-//	    String template ="TEMPLATE_ONE_INPUT_RULE.dmn";
-//	    String output = "RBAC_RULES.dmn";
-//
-//	    String decisionId = "decisionID";
-//
-//	    long numberOfRules = 2;
-//	    long numberOfInputs = 1;
-//	
-//	    generateDmn(template, output, decisionId, numberOfRules, numberOfInputs);
-//	    
 		return "added";
 	}
 

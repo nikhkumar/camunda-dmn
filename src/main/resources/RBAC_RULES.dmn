@@ -1,16 +1,16 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<definitions xmlns="http://www.omg.org/spec/DMN/20151101/dmn.xsd" xmlns:biodi="http://bpmn.io/schema/dmn/biodi/1.0" id="definitionID" name="DRD" namespace="http://camunda.org/schema/1.0/dmn" exporter="Camunda Modeler" exporterVersion="3.1.0">
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<definitions xmlns="http://www.omg.org/spec/DMN/20151101/dmn.xsd" xmlns:biodi="http://bpmn.io/schema/dmn/biodi/1.0" exporter="Camunda Modeler" exporterVersion="3.1.0" expressionLanguage="http://www.omg.org/spec/FEEL/20140401" id="definitionID" name="DRD" namespace="http://camunda.org/schema/1.0/dmn" typeLanguage="http://www.omg.org/spec/FEEL/20140401">
   <decision id="decisionID" name=" RBAC_RULES">
     <extensionElements>
-      <biodi:bounds x="157" y="81" width="180" height="80" />
+      <biodi:bounds height="80" width="180" x="157" y="81"/>
     </extensionElements>
-    <decisionTable id="decisionTableID" hitPolicy="FIRST">
+    <decisionTable hitPolicy="FIRST" id="decisionTableID" preferredOrientation="Rule-as-Row">
       <input id="role" label="Role">
         <inputExpression id="inputExpression_1" typeRef="string">
           <text>role</text>
         </inputExpression>
       </input>
-      <output id="permission" label="Permission" typeRef="string" />
+      <output id="permission" label="Permission" typeRef="string"/>
       <rule id="DecisionRule_0103z81">
         <inputEntry id="UnaryTests_14e18iz">
           <text>"DEVELOPER"</text>
@@ -27,6 +27,57 @@
           <text>"VIEW,ADD,UPDATE,DELETE"</text>
         </outputEntry>
       </rule>
+      <rule id="rule_cf713002-947e-4104-bc99-8fc843d6cd70">
+        <inputEntry id="inputEntry_96d644d9-9e94-46d4-bdef-d9f2d120c185">
+          <text>"TESTER"</text>
+        </inputEntry>
+        <outputEntry id="outputEntry_a5f70cd3-0680-4807-b627-5d0af2d424e5">
+          <text>"VIEW"</text>
+        </outputEntry>
+      </rule>
+      <rule id="rule_dcf26788-ecf0-41fb-878b-03a31a2b70a1">
+        <inputEntry id="inputEntry_90b7d70b-0ddd-4185-80da-b28eb0838ade">
+          <text>"MANAGER"</text>
+        </inputEntry>
+        <outputEntry id="outputEntry_ec059921-5f56-470d-be8a-13c9e25e474a">
+          <text>"VIEW"</text>
+        </outputEntry>
+      </rule>
+      <rule id="rule_2133e384-3fac-4838-997b-c50a791f7385">
+        <inputEntry id="inputEntry_2424efed-cb97-4d53-9b5f-6040724cc1ea">
+          <text>"TESTER-1"</text>
+        </inputEntry>
+        <outputEntry id="outputEntry_bfe654be-d064-4116-be2d-d655259cc1c9">
+          <text>"VIEW,ADD"</text>
+        </outputEntry>
+      </rule>
+      <rule id="rule_481dd27a-2b8d-425a-9010-b34ca8dcfdb7">
+        <inputEntry id="inputEntry_3acbba0b-0d32-48fe-a515-cfeec14ef50c">
+          <text>"MANAGER-1"</text>
+        </inputEntry>
+        <outputEntry id="outputEntry_101d1a73-2b0b-436c-bced-e1e3f439d204">
+          <text>"VIEW,ADD"</text>
+        </outputEntry>
+      </rule>
+      <rule id="rule_4f86c3a5-ad8e-4f04-a7a3-089c197af6b8">
+        <inputEntry id="inputEntry_eff4c015-da29-4851-b71f-5dc1e91da252">
+          <text>"TESTER-2"</text>
+        </inputEntry>
+        <outputEntry id="outputEntry_df35e352-d0fd-4ab4-a016-58ead8dcfbb3">
+          <text>"VIEW,ADD"</text>
+        </outputEntry>
+      </rule>
+      <rule id="rule_72f75e96-6186-458a-a7f0-1c0b908760d5">
+        <inputEntry id="inputEntry_ab4af915-b2ff-4d2e-a4fe-5876e95e16f9">
+          <text>"MANAGER-2"</text>
+        </inputEntry>
+        <outputEntry id="outputEntry_3c12b2af-45e9-42bc-9ef3-0f2eb2508820">
+          <text>"VIEW,ADD"</text>
+        </outputEntry>
+      </rule>
+
+
+  
     </decisionTable>
   </decision>
 </definitions>
