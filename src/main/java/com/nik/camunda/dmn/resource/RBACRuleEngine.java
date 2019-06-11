@@ -2,6 +2,8 @@ package com.nik.camunda.dmn.resource;
 
 import java.io.File;
 import java.io.InputStream;
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Target;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -9,6 +11,8 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+
+import javax.ws.rs.QueryParam;
 
 import org.camunda.bpm.dmn.engine.DmnDecision;
 import org.camunda.bpm.dmn.engine.DmnDecisionTableResult;
@@ -35,6 +39,7 @@ import org.camunda.bpm.model.dmn.instance.Text;
 import org.camunda.commons.utils.IoUtil;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.nik.camunda.dmn.model.RPRequest;
@@ -52,39 +57,46 @@ import com.nik.camunda.dmn.model.RolePermission;
 @RestController
 public class RBACRuleEngine {
 
-	@RequestMapping("/rule")
-	public RPResponse getRule(@RequestBody RPRequest request) {
+	// http://localhost:8091/rule?role=DEVELOPER
+	@RequestMapping(path = "/rule{role}", method = RequestMethod.GET)
+	public RPResponse getRule(@QueryParam("role") String role) {
 
-		// configure and build the DMN engine
-		DmnEngine dmnEngine = DmnEngineConfiguration.createDefaultDmnEngineConfiguration().buildEngine();
-
-		// parse a decision
-		InputStream inputStream = IoUtil.fileAsStream("RBAC_RULES.dmn");
-
-		DmnDecision decision = dmnEngine.parseDecision("decisionID", inputStream);
-
-		Map<String, Object> data = new HashMap<String, Object>();
-		data.put("role", request.getRole());
-
-		// evaluate a decision
-		DmnDecisionTableResult result = dmnEngine.evaluateDecisionTable(decision, data);
-
+		RPResponse response = new RPResponse();
 		List<String> myList = null;
 
-		if (result != null && result.getSingleResult() != null) {
-			String str = result.getSingleResult().getSingleEntry();
-			System.out.println(str);
-			myList = new ArrayList<String>(Arrays.asList(str.split(",")));
+		if (role != null && !"".equalsIgnoreCase(role.trim())) {
+			// configure and build the DMN engine
+			DmnEngine dmnEngine = DmnEngineConfiguration.createDefaultDmnEngineConfiguration().buildEngine();
 
+			// parse a decision
+			InputStream inputStream = IoUtil.fileAsStream("RBAC_RULES.dmn");
+			DmnDecision decision = dmnEngine.parseDecision("decisionID", inputStream);
+
+			Map<String, Object> data = new HashMap<String, Object>();
+			data.put("role", role.toUpperCase());
+
+			// evaluate a decision
+			DmnDecisionTableResult result = dmnEngine.evaluateDecisionTable(decision, data);
+
+			if (result != null && result.getSingleResult() != null) {
+				String str = result.getSingleResult().getSingleEntry();
+				System.out.println(str);
+				myList = new ArrayList<String>(Arrays.asList(str.split(",")));
+			}
+			response.setPermission(myList);
+			response.setRole(role);
+			return response;
 		}
-		RPResponse response = new RPResponse();
-		response.setRole(request.getRole());
+
+		myList = new ArrayList<String>();
+		myList.add("VIEW");
+
+		response.setRole(role);
 		response.setPermission(myList);
 		return response;
-
 	}
 
-	@RequestMapping("/addrule")
+	@RequestMapping(path = "/rule", method = RequestMethod.POST)
 	public String addRule(@RequestBody RPRule request) {
 
 		String currentDMN = "RBAC_RULES.dmn";
@@ -103,7 +115,7 @@ public class RBACRuleEngine {
 
 				for (RolePermission rolePer : request.getRules()) {
 
-					sb.append("-"+rolePer.getRole());
+					sb.append("-" + rolePer.getRole());
 					String output = String.join(",", rolePer.getPermission());
 
 					Rule newRuleToAdd = createRuleNew(dmnModelInstance, 1, "\"" + rolePer.getRole() + "\"",
@@ -131,8 +143,7 @@ public class RBACRuleEngine {
 					org.camunda.bpm.engine.repository.Deployment deployment = processEngine.getRepositoryService()
 							.createDeployment()
 							.addString("src/main/resources/" + currentDMN, Dmn.convertToString(dmnModelInstance))
-							.name("Deployment" + sb.toString())
-							.deploy();
+							.name("Deployment" + sb.toString()).deploy();
 
 					System.out.println("Deployment ID : " + deployment.getId());
 				} finally {
