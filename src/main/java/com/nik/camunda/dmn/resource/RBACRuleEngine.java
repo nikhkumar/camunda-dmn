@@ -2,8 +2,6 @@ package com.nik.camunda.dmn.resource;
 
 import java.io.File;
 import java.io.InputStream;
-import java.lang.annotation.ElementType;
-import java.lang.annotation.Target;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -20,7 +18,6 @@ import org.camunda.bpm.dmn.engine.DmnEngine;
 import org.camunda.bpm.dmn.engine.DmnEngineConfiguration;
 import org.camunda.bpm.engine.ProcessEngine;
 import org.camunda.bpm.engine.ProcessEngineConfiguration;
-import org.camunda.bpm.engine.repository.DeploymentBuilder;
 import org.camunda.bpm.engine.variable.VariableMap;
 import org.camunda.bpm.engine.variable.Variables;
 import org.camunda.bpm.model.dmn.Dmn;
@@ -42,27 +39,161 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.nik.camunda.dmn.model.RPRequest;
+import com.nik.camunda.dmn.model.DMNResponse;
 import com.nik.camunda.dmn.model.RPResponse;
 import com.nik.camunda.dmn.model.RPRule;
 import com.nik.camunda.dmn.model.RolePermission;
+import com.nik.camunda.dmn.util.Constant;
 
-/*
- * Notes
- * https://github.com/camunda/camunda-engine-dmn-benchmark
+/**
+ * References https://github.com/camunda/camunda-engine-dmn-benchmark
  * https://forum.camunda.org/t/programmatic-management-of-dmn-tables/4240
  * https://stackoverflow.com/questions/56382788/how-to-update-camunda-dmn-table-at-runtime
  * 
+ * @git https://github.com/nikhkumar/camunda-dmn.git
+ * @author Nikhil Kumar
  */
 @RestController
 public class RBACRuleEngine {
 
-	// http://localhost:8091/rule?role=DEVELOPER
-	@RequestMapping(path = "/rule{role}", method = RequestMethod.GET)
-	public RPResponse getRule(@QueryParam("role") String role) {
+	String currentDMN = "RBAC_RULES.dmn";
+	String outputDMN = "OUT_RBAC_RULES.dmn";
 
-		RPResponse response = new RPResponse();
+	/**
+	 * Deletes the rule for the given role, updates the DMN table and redeploys
+	 * again http://localhost:8091/rule?role=DEVELOPER
+	 * 
+	 * @param role
+	 * @return message
+	 */
+	@RequestMapping(path = "/rule{role}", method = RequestMethod.DELETE)
+	public DMNResponse deleteRule(@QueryParam("role") String role) {
+
+		if (role != null && !"".equalsIgnoreCase(role.trim())) {
+
+			InputStream inputStream = IoUtil.fileAsStream(currentDMN);
+			DmnModelInstance dmnModelInstance = Dmn.readModelFromStream(inputStream);
+
+			DecisionTable decisionTable = dmnModelInstance.getModelElementById("decisionTableID");
+
+			/** Iterating through all the rules under decision table */
+			for (Rule currRule : decisionTable.getRules()) {
+				for (InputEntry inEntry : currRule.getInputEntries()) {
+					String rawText = inEntry.getRawTextContent();
+
+					/** Removing the rule from decision table if the rawText=requestRole */
+					if (rawText != null && role.equalsIgnoreCase((rawText).substring(1, (rawText.length() - 1)))) {
+						System.out.println(role + "------" + rawText + " REMOVE");
+						decisionTable.getRules().remove(currRule);
+					}
+				}
+			}
+			/** Creating a DMN file with same name */
+			File dmnFile = new File("src/main/resources/" + currentDMN);
+			Dmn.writeModelToFile(dmnFile, dmnModelInstance);
+
+			System.out.println("GENERATE DMN file : " + dmnFile.getAbsolutePath());
+
+			ProcessEngine processEngine = ProcessEngineConfiguration.createStandaloneInMemProcessEngineConfiguration()
+					.buildProcessEngine();
+			try {
+
+				/** when instance is deployed via addString method */
+				org.camunda.bpm.engine.repository.Deployment deployment = processEngine.getRepositoryService()
+						.createDeployment()
+						.addString("src/main/resources/" + currentDMN, Dmn.convertToString(dmnModelInstance))
+						.name("Deployment after delete " + new Date()).deploy();
+
+			} finally {
+				// processEngine.close();
+			}
+			return prepareResponse(Constant.RES_STATUS_OK, Constant.RES_CODE_OK, "Rule deleted sucuessfully", null);
+		} else {
+			return prepareResponse(Constant.RES_STATUS_ERR, Constant.RES_CODE_ERR, "Role is missing", null);
+		}
+	}
+
+	/**
+	 * Updates the rule for the given role, updates the DMN table and redeploys
+	 * again http://localhost:8091/rule?role=DEVELOPER
+	 * 
+	 * @param role
+	 * @return message
+	 */
+	@RequestMapping(path = "/rule{role}", method = RequestMethod.PUT)
+	public DMNResponse updateRule(@QueryParam("role") String role, @RequestBody RPRule request) {
+
+		if (role != null && !"".equalsIgnoreCase(role.trim())) {
+
+			InputStream inputStream = IoUtil.fileAsStream(currentDMN);
+			DmnModelInstance dmnModelInstance = Dmn.readModelFromStream(inputStream);
+
+			DecisionTable decisionTable = dmnModelInstance.getModelElementById("decisionTableID");
+
+			/** Iterating through all the rules under decision table */
+			for (Rule currRule : decisionTable.getRules()) {
+				for (InputEntry inEntry : currRule.getInputEntries()) {
+					String rawText = inEntry.getRawTextContent();
+
+					/** Removing the rule from decision table if the rawText=requestRole */
+					if (rawText != null && role.equalsIgnoreCase((rawText).substring(1, (rawText.length() - 1)))) {
+						System.out.println("REMOVE " + role + "------" + rawText);
+						decisionTable.getRules().remove(currRule);
+					}
+				}
+			}
+			/** Adding the new rule sent in the request */
+			for (RolePermission rolePer : request.getRules()) {
+
+				String output = String.join(",", rolePer.getPermission());
+
+				System.out.println("ADD " + rolePer.getRole() + " -- " + output);
+				Rule newRuleToAdd = createRuleNew(dmnModelInstance, 1, "\"" + rolePer.getRole() + "\"",
+						"\"" + output + "\"");
+				decisionTable.getRules().add(newRuleToAdd);
+			} // for
+
+			/** Creating a DMN file with same name */
+			File dmnFile = new File("src/main/resources/" + currentDMN);
+			Dmn.writeModelToFile(dmnFile, dmnModelInstance);
+
+			System.out.println("GENERATE DMN file : " + dmnFile.getAbsolutePath());
+
+			ProcessEngine processEngine = ProcessEngineConfiguration.createStandaloneInMemProcessEngineConfiguration()
+					.buildProcessEngine();
+			try {
+
+				/** when instance is deployed via addString method */
+				org.camunda.bpm.engine.repository.Deployment deployment = processEngine.getRepositoryService()
+						.createDeployment()
+						.addString("src/main/resources/" + currentDMN, Dmn.convertToString(dmnModelInstance))
+						.name("Deployment after update " + new Date()).deploy();
+			} finally {
+				// processEngine.close();
+			}
+			return prepareResponse(Constant.RES_STATUS_OK, Constant.RES_CODE_OK, "Rule updated sucuessfully", null);
+		} else {
+			return prepareResponse(Constant.RES_STATUS_ERR, Constant.RES_CODE_ERR, "Role is missing", null);
+		}
+	}
+
+	/**
+	 * Gets the permissions for the given role
+	 * http://localhost:8091/rule?role=DEVELOPER
+	 * 
+	 * @param role
+	 * @return list of permissions
+	 */
+	@RequestMapping(path = "/rule{role}", method = RequestMethod.GET)
+	public DMNResponse getRule(@QueryParam("role") String role) {
+
+		RPResponse ruleResponse = new RPResponse();
 		List<String> myList = null;
+
+		ruleResponse.setRole(role);
+		myList = new ArrayList<String>();
+		myList.add("VIEW");
+		ruleResponse.setPermission(myList);
 
 		if (role != null && !"".equalsIgnoreCase(role.trim())) {
 			// configure and build the DMN engine
@@ -82,25 +213,26 @@ public class RBACRuleEngine {
 				String str = result.getSingleResult().getSingleEntry();
 				System.out.println(str);
 				myList = new ArrayList<String>(Arrays.asList(str.split(",")));
+				ruleResponse.setPermission(myList);
+				return prepareResponse(Constant.RES_STATUS_OK, Constant.RES_CODE_OK, null, ruleResponse);
+			} else {
+				return prepareResponse(Constant.RES_STATUS_OK, Constant.RES_CODE_OK,
+						"Role not found, setting to default permission", ruleResponse);
 			}
-			response.setPermission(myList);
-			response.setRole(role);
-			return response;
 		}
-
-		myList = new ArrayList<String>();
-		myList.add("VIEW");
-
-		response.setRole(role);
-		response.setPermission(myList);
-		return response;
+		return prepareResponse(Constant.RES_STATUS_OK, Constant.RES_CODE_OK,
+				"Role value missing in request, setting to default permission", ruleResponse);
 	}
 
+	/**
+	 * Creates a new rule, update the DMn table and redeploys again
+	 * 
+	 * @param request
+	 * @return message
+	 */
 	@RequestMapping(path = "/rule", method = RequestMethod.POST)
-	public String addRule(@RequestBody RPRule request) {
+	public DMNResponse createule(@RequestBody RPRule request) {
 
-		String currentDMN = "RBAC_RULES.dmn";
-		String outputDMN = "OUT_RBAC_RULES.dmn";
 		StringBuffer sb = new StringBuffer();
 
 		if (request != null) {
@@ -113,6 +245,7 @@ public class RBACRuleEngine {
 
 				DecisionTable decisionTable = dmnModelInstance.getModelElementById("decisionTableID");
 
+				/** Create new rules based on request data and adding to decision table */
 				for (RolePermission rolePer : request.getRules()) {
 
 					sb.append("-" + rolePer.getRole());
@@ -122,6 +255,8 @@ public class RBACRuleEngine {
 							"\"" + output + "\"");
 					decisionTable.getRules().add(newRuleToAdd);
 				} // for
+
+				/** Creating a DMN file with same name */
 				File dmnFile = new File("src/main/resources/" + currentDMN);
 				Dmn.writeModelToFile(dmnFile, dmnModelInstance);
 
@@ -130,20 +265,19 @@ public class RBACRuleEngine {
 				ProcessEngine processEngine = ProcessEngineConfiguration
 						.createStandaloneInMemProcessEngineConfiguration().buildProcessEngine();
 
-				System.out.println(processEngine.VERSION);
 				try {
-//					      processEngine.getRepositoryService()
-//					        .createDeployment()
-//					        .name("new dmn deployment")
-//					        //.addClasspathResource("OUT_RBAC_RULES.dmn")
-//					        .addInputStream(outputDMN, ClassLoader.getSystemResourceAsStream(outputDMN))
-//					        .deploy();
+					//					      processEngine.getRepositoryService()
+					//					        .createDeployment()
+					//					        .name("new dmn deployment")
+					//					        //.addClasspathResource("OUT_RBAC_RULES.dmn")
+					//					        .addInputStream(outputDMN, ClassLoader.getSystemResourceAsStream(outputDMN))
+					//					        .deploy();
 
-					// when instance is deployed via addString method
+					/** when instance is deployed via addString method */
 					org.camunda.bpm.engine.repository.Deployment deployment = processEngine.getRepositoryService()
 							.createDeployment()
 							.addString("src/main/resources/" + currentDMN, Dmn.convertToString(dmnModelInstance))
-							.name("Deployment" + sb.toString()).deploy();
+							.name("Deployment after ADD " + sb.toString()).deploy();
 
 					System.out.println("Deployment ID : " + deployment.getId());
 				} finally {
@@ -151,7 +285,18 @@ public class RBACRuleEngine {
 				}
 			}
 		}
-		return "added";
+		return prepareResponse(Constant.RES_STATUS_OK, Constant.RES_CODE_OK, "Rule added sucuessfully", null);
+	}
+
+	/******************************************************************************/
+
+	private DMNResponse prepareResponse(String resStatus, int resCode, String message, RPResponse ruleResponse) {
+		DMNResponse response = new DMNResponse();
+		response.setCode(resCode);
+		response.setMessage(message);
+		response.setStatus(resStatus);
+		response.setResult(ruleResponse);
+		return response;
 	}
 
 	private Rule createRuleNew(DmnModelInstance dmnModelInstance, double numberOfInputs, String in, String out) {
@@ -185,7 +330,7 @@ public class RBACRuleEngine {
 		DecisionTable decisionTable = dmnModelInstance.getModelElementById("decisionTableID");
 
 		for (int i = 0; i < numberOfRules; i++) {
-			double x = (double) i / numberOfRules;
+			//double x = (double) i / numberOfRules;
 
 			Rule rule = createRule(dmnModelInstance, numberOfInputs, "PARTNER");
 			decisionTable.getRules().add(rule);
@@ -270,18 +415,18 @@ public class RBACRuleEngine {
 		jahreszeitInput.addChildElement(inputExpression);
 		decisionTable.addChildElement(jahreszeitInput);
 
-//	    Input anzahlGaesteInput = modelInstance.newInstance(Input.class);
-//	    anzahlGaesteInput.setId("Input_2");
-//	    anzahlGaesteInput.setLabel("Number of guests");
-//	    
-//	    InputExpression inputExpression2 = modelInstance.newInstance(InputExpression.class);
-//	    inputExpression2.setId("InputExpression_2");
-//	    inputExpression2.setTypeRef("integer");
-//	    Text text3 = modelInstance.newInstance(Text.class);
-//	    text3.setTextContent("guestCount");
-//	    inputExpression2.setText(text3);
-//	    anzahlGaesteInput.addChildElement(inputExpression2);
-//	    decisionTable.addChildElement(anzahlGaesteInput);
+		//	    Input anzahlGaesteInput = modelInstance.newInstance(Input.class);
+		//	    anzahlGaesteInput.setId("Input_2");
+		//	    anzahlGaesteInput.setLabel("Number of guests");
+		//	    
+		//	    InputExpression inputExpression2 = modelInstance.newInstance(InputExpression.class);
+		//	    inputExpression2.setId("InputExpression_2");
+		//	    inputExpression2.setTypeRef("integer");
+		//	    Text text3 = modelInstance.newInstance(Text.class);
+		//	    text3.setTextContent("guestCount");
+		//	    inputExpression2.setText(text3);
+		//	    anzahlGaesteInput.addChildElement(inputExpression2);
+		//	    decisionTable.addChildElement(anzahlGaesteInput);
 
 		Output output = modelInstance.newInstance(Output.class);
 		output.setId("permission");
@@ -300,13 +445,13 @@ public class RBACRuleEngine {
 
 		rule.addChildElement(inputEntry);
 
-//	    Text text4 = modelInstance.newInstance(Text.class);
-//	    text4.setTextContent("<4");
-//	    InputEntry inputEntry2 = modelInstance.newInstance(InputEntry.class);
-//	    inputEntry2.setId("input_4");
-//	    inputEntry2.addChildElement(text4);
-//	    
-//	    rule.addChildElement(inputEntry2);
+		//	    Text text4 = modelInstance.newInstance(Text.class);
+		//	    text4.setTextContent("<4");
+		//	    InputEntry inputEntry2 = modelInstance.newInstance(InputEntry.class);
+		//	    inputEntry2.setId("input_4");
+		//	    inputEntry2.addChildElement(text4);
+		//	    
+		//	    rule.addChildElement(inputEntry2);
 
 		OutputEntry outputEntry = modelInstance.newInstance(OutputEntry.class);
 		outputEntry.setId("output_2");
@@ -328,13 +473,13 @@ public class RBACRuleEngine {
 
 		rule2.addChildElement(inputEntry1);
 
-//	    Text text41 = modelInstance.newInstance(Text.class);
-//	    text41.setTextContent(">=4");
-//	    InputEntry inputEntry21 = modelInstance.newInstance(InputEntry.class);
-//	    inputEntry21.setId("input_2");
-//	    inputEntry21.addChildElement(text41);
-//	    
-//	    rule2.addChildElement(inputEntry21);
+		//	    Text text41 = modelInstance.newInstance(Text.class);
+		//	    text41.setTextContent(">=4");
+		//	    InputEntry inputEntry21 = modelInstance.newInstance(InputEntry.class);
+		//	    inputEntry21.setId("input_2");
+		//	    inputEntry21.addChildElement(text41);
+		//	    
+		//	    rule2.addChildElement(inputEntry21);
 
 		OutputEntry outputEntry1 = modelInstance.newInstance(OutputEntry.class);
 		outputEntry1.setId("output_1");
@@ -370,6 +515,5 @@ public class RBACRuleEngine {
 			System.out.println("" + inputEntry3.getRawTextContent());
 
 		}
-
 	}
 }

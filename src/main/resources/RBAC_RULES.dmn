@@ -11,30 +11,9 @@
         </inputExpression>
       </input>
       <output id="permission" label="Permission" typeRef="string"/>
-      <rule id="DecisionRule_0103z81">
-        <inputEntry id="UnaryTests_14e18iz">
-          <text>"DEVELOPER"</text>
-        </inputEntry>
-        <outputEntry id="LiteralExpression_1rwd19i">
-          <text>"VIEW,ADD,UPDATE"</text>
-        </outputEntry>
-      </rule>
-      <rule id="DecisionRule_15wtdqd">
-        <inputEntry id="UnaryTests_19q493e">
-          <text>"ADMIN"</text>
-        </inputEntry>
-        <outputEntry id="LiteralExpression_0gc5g3e">
-          <text>"VIEW,ADD,UPDATE,DELETE"</text>
-        </outputEntry>
-      </rule>
-      <rule id="rule_cf713002-947e-4104-bc99-8fc843d6cd70">
-        <inputEntry id="inputEntry_96d644d9-9e94-46d4-bdef-d9f2d120c185">
-          <text>"TESTER"</text>
-        </inputEntry>
-        <outputEntry id="outputEntry_a5f70cd3-0680-4807-b627-5d0af2d424e5">
-          <text>"VIEW"</text>
-        </outputEntry>
-      </rule>
+      
+      
+      
       <rule id="rule_dcf26788-ecf0-41fb-878b-03a31a2b70a1">
         <inputEntry id="inputEntry_90b7d70b-0ddd-4185-80da-b28eb0838ade">
           <text>"MANAGER"</text>
@@ -73,6 +52,14 @@
         </inputEntry>
         <outputEntry id="outputEntry_3c12b2af-45e9-42bc-9ef3-0f2eb2508820">
           <text>"VIEW,ADD"</text>
+        </outputEntry>
+      </rule>
+      <rule id="rule_9fb69540-84f8-4167-aed5-f19561d7d436">
+        <inputEntry id="inputEntry_0d3a6aca-c4e0-48d6-9526-e3e0775ee738">
+          <text>"TESTER"</text>
+        </inputEntry>
+        <outputEntry id="outputEntry_8bb5d3d0-cc3f-4680-a703-91930c947467">
+          <text>"VIEW,ADD,DELETE"</text>
         </outputEntry>
       </rule>
 
