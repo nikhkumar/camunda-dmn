@@ -62,6 +62,14 @@
           <text>"VIEW,ADD,DELETE"</text>
         </outputEntry>
       </rule>
+      <rule id="rule_36d3012a-0c3a-4851-8435-ea73077c18ca">
+        <inputEntry id="inputEntry_bb7c24f8-ba91-4c5c-819c-e44a2041b54a">
+          <text>"TESTER-222"</text>
+        </inputEntry>
+        <outputEntry id="outputEntry_0165169a-4f38-4c88-b403-b236d5a30515">
+          <text>"VIEW,ADD,DELETEqq"</text>
+        </outputEntry>
+      </rule>
 
 
   

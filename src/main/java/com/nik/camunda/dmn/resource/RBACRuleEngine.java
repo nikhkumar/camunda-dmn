@@ -10,6 +10,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import javax.annotation.security.PermitAll;
+import javax.annotation.security.RolesAllowed;
 import javax.ws.rs.QueryParam;
 
 import org.camunda.bpm.dmn.engine.DmnDecision;
@@ -34,6 +36,8 @@ import org.camunda.bpm.model.dmn.instance.OutputEntry;
 import org.camunda.bpm.model.dmn.instance.Rule;
 import org.camunda.bpm.model.dmn.instance.Text;
 import org.camunda.commons.utils.IoUtil;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
@@ -185,8 +189,13 @@ public class RBACRuleEngine {
 	 * @return list of permissions
 	 */
 	@RequestMapping(path = "/rule{role}", method = RequestMethod.GET)
-	public DMNResponse getRule(@QueryParam("role") String role) {
+	//@PermitAll
+	public DMNResponse getRule(@QueryParam("role") String role, @AuthenticationPrincipal final UserDetails userD) {
 
+		
+		System.out.println(userD.getUsername());
+		userD.getAuthorities().stream().forEach(ath -> System.out.println(ath));
+		
 		RPResponse ruleResponse = new RPResponse();
 		List<String> myList = null;
 
@@ -231,6 +240,7 @@ public class RBACRuleEngine {
 	 * @return message
 	 */
 	@RequestMapping(path = "/rule", method = RequestMethod.POST)
+	//@RolesAllowed("ADMIN")
 	public DMNResponse createule(@RequestBody RPRule request) {
 
 		StringBuffer sb = new StringBuffer();
